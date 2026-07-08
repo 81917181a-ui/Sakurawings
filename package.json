@@ -1,0 +1,13 @@
+{
+  "name": "discord-beak-bot-web",
+  "version": "1.0.0",
+  "description": "Server deleter bot for Render Web Service",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "express": "^4.19.2"
+  }
+}
