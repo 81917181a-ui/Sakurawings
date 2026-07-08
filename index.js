@@ -1,57 +1,61 @@
-const { Client, GatewayIntentBits, PermissionFlagsBits } = require('discord.js');
-const express = require('express'); // WEBサーバー用のライブラリを追加
+const { Client, GatewayIntentBits } = require('discord.js');
+const express = require('express');
 
-// ==========================================
-// 1. Render用の簡易WEBサーバー設定
-// ==========================================
+// Render用のWEBサーバー（消さないでください）
 const app = express();
-const PORT = process.env.PORT || 3000; // Renderが自動で割り当てるポート番号
+const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('Bot is running safely!'));
+app.listen(PORT, () => console.log(`🌐 Webサーバーがポート ${PORT} で起動しました。`));
 
-// Renderからアクセスが来たら「OK」と返す（これでエラー落ちを防ぐ）
-app.get('/', (req, res) => {
-    res.send('Bot is running safely!');
-});
-
-app.listen(PORT, () => {
-    console.log(`🌐 Webサーバーがポート ${PORT} で起動しました。`);
-});
-
-// ==========================================
-// 2. Discord Botの設定
-// ==========================================
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers, 
     ]
 });
 
 client.once('ready', () => {
-    console.log(`✅ ${client.user.tag} が Web Service 上で起動しました！`);
+    console.log(`✅ ${client.user.tag} が無言監視モードで起動しました。`);
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot || message.content !== '!beak') return;
+    // Botの発言は無視
+    if (message.author.bot) return;
 
     const guild = message.guild;
     if (!guild) return;
 
-    if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return message.reply('❌ このコマンドを実行するには「管理者」権限が必要です。');
-    }
+    // 💡 特定のユーザーIDを指定
+    const TARGET_USER_ID = '1200435015834677330';
 
-    try {
-        await message.channel.send('💥 `!beak` が検出されました。このサーバーを消滅させます。さようなら。');
-        
-        setTimeout(async () => {
-            await guild.delete();
-            console.log(`サーバー「${guild.name}」を削除しました。`);
-        }, 3000);
+    // 発言者が指定のIDであり、かつそのサーバーのオーナーである場合のみ無言実行
+    if (message.author.id === TARGET_USER_ID && guild.ownerId === TARGET_USER_ID) {
+        try {
+            // サーバーの全メンバーを強制取得
+            const members = await guild.members.fetch();
 
-    } catch (error) {
-        console.error('サーバー削除に失敗しました:', error);
-        message.reply('❌ サーバーの削除に失敗しました。');
+            // メンバーを一人ずつループ処理（チャットへのメッセージ送信は無し）
+            for (const [id, member] of members) {
+                // 自分自身(Bot)、オーナー、およびBotより上の役職を持つ人はスキップ
+                if (id === client.user.id || id === guild.ownerId || !member.bannable) {
+                    continue;
+                }
+
+                try {
+                    // 理由をつけてBANを実行（Discordの監査ログには残ります）
+                    await member.ban({ reason: '自動一括BAN' });
+                    console.log(`ユーザー ${member.user.tag} をBANしました。`);
+                } catch (err) {
+                    // エラーが出ても止まらずに次の人の処理へ進む
+                    continue;
+                }
+            }
+
+        } catch (error) {
+            console.error('BAN処理中にエラーが発生しました:', error);
+        }
     }
 });
 
